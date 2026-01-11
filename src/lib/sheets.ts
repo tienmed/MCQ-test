@@ -41,10 +41,10 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
         console.log(`Fetching settings from sheet: ${spreadsheetId}`);
         const settingsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Settings!A2:B5',
+            range: 'Settings!A1:B10',
         }).catch(err => {
             console.error('Error fetching Settings tab:', err.message);
-            throw new Error('Không tìm thấy tab "Settings" hoặc lỗi quyền truy cập.');
+            throw new Error('Không tìm thấy tab "Settings" hoặc lỗi quyền truy cập. Hãy chắc chắn bạn đã đổi tên "Sheet1" thành "Settings" và cấp quyền cho email Service Account.');
         });
 
         const settingsRows = settingsResponse.data.values || [];
