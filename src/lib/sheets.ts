@@ -38,6 +38,14 @@ async function getSheetsClient() {
 
             // Clean any starting/ending whitespace or quotes inside the JSON field
             key = key.trim();
+
+            // FIX: Restore missing spaces in PEM headers (BEGINPRIVATEKEY -> BEGIN PRIVATE KEY)
+            if (key.includes('BEGINPRIVATEKEY')) {
+                key = key.replace('BEGINPRIVATEKEY', 'BEGIN PRIVATE KEY');
+            }
+            if (key.includes('ENDPRIVATEKEY')) {
+                key = key.replace('ENDPRIVATEKEY', 'END PRIVATE KEY');
+            }
         }
         credentials.private_key = key;
 
