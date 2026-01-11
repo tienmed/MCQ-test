@@ -40,5 +40,6 @@ export const mockQuizSettings: QuizSettings = {
     title: "Bài Trắc Nghiệm Kiến Thức Tổng Hợp",
     durationMinutes: 5,
     shuffleQuestions: true,
-    shuffleOptions: true
+    shuffleOptions: true,
+    mode: 'Exam'
 };
