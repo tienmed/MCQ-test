@@ -8,15 +8,19 @@ async function getSheetsClient() {
         let keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
         if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is missing');
 
-        // Clean potentially extra quotes from Vercel UI
+        // Clean extra quotes and whitespace
         keyString = keyString.trim();
-        if ((keyString.startsWith('"') && keyString.endsWith('"')) || (keyString.startsWith("'") && keyString.endsWith("'"))) {
+        while (keyString.startsWith('"') || keyString.startsWith("'")) {
             keyString = keyString.slice(1, -1);
         }
 
         let credentials;
         try {
             credentials = JSON.parse(keyString);
+            // Handle cases where the env var is a stringified JSON string (double stringified)
+            if (typeof credentials === 'string') {
+                credentials = JSON.parse(credentials);
+            }
         } catch (e) {
             throw new Error(`GOOGLE_SERVICE_ACCOUNT_KEY không đúng định dạng JSON: ${e instanceof Error ? e.message : 'Unknown'}`);
         }
@@ -25,8 +29,14 @@ async function getSheetsClient() {
             throw new Error('Service Account JSON thiếu trường "private_key".');
         }
 
-        // Fix private key formatting: handle literal \n and real newlines
-        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+        // Extremely robust private key formatting
+        // Convert literal \n strings to real newlines, multiple times if needed
+        let key = credentials.private_key;
+        if (typeof key === 'string') {
+            key = key.split('\\n').join('\n');
+            key = key.split('\\\\n').join('\n'); // Handle double escaping
+        }
+        credentials.private_key = key;
 
         const auth = new google.auth.GoogleAuth({
             credentials,
