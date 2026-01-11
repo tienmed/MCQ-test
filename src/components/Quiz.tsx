@@ -23,12 +23,19 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
     // Initialize questions
     useEffect(() => {
         let q = [...questions];
+        // Shuffle first so the subset is random
         if (settings.shuffleQuestions) q = shuffle(q);
+
+        // Question Bank logic: slice to questionCount if specified
+        if (settings.questionCount && settings.questionCount > 0 && settings.questionCount < q.length) {
+            q = q.slice(0, settings.questionCount);
+        }
+
         if (settings.shuffleOptions) {
             q = q.map(item => ({ ...item, options: shuffle(item.options) }));
         }
         setShuffledQuestions(q);
-    }, [questions, settings.shuffleQuestions, settings.shuffleOptions]);
+    }, [questions, settings.shuffleQuestions, settings.shuffleOptions, settings.questionCount]);
 
     const handleSubmit = useCallback(() => {
         if (isFinished) return;

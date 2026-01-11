@@ -93,7 +93,8 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
             durationMinutes: parseInt(settingsMap['Duration']) || 30,
             shuffleQuestions: settingsMap['ShuffleQuestions'] === 'TRUE',
             shuffleOptions: settingsMap['ShuffleOptions'] === 'TRUE',
-            mode: (settingsMap['Mode'] as 'Exam' | 'Study') || 'Exam',
+            mode: (settingsMap['Mode']?.toString().toLowerCase() === 'study') ? 'Study' : 'Exam',
+            questionCount: parseInt(settingsMap['QuestionCount']) || undefined,
         };
 
         // Fetch Questions

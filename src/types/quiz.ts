@@ -12,6 +12,7 @@ export interface QuizSettings {
     shuffleQuestions: boolean;
     shuffleOptions: boolean;
     mode: 'Exam' | 'Study';
+    questionCount?: number;
 }
 
 export interface QuizResult {
