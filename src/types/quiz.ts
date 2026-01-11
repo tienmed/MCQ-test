@@ -11,6 +11,7 @@ export interface QuizSettings {
     durationMinutes: number;
     shuffleQuestions: boolean;
     shuffleOptions: boolean;
+    mode: 'Exam' | 'Study';
 }
 
 export interface QuizResult {
@@ -20,9 +21,5 @@ export interface QuizResult {
     totalQuestions: number;
     startTime: string;
     endTime: string;
-    answers: {
-        questionId: string;
-        selectedAnswer: string;
-        isCorrect: boolean;
-    }[];
+    userAnswers: Record<string, string>; // Maps Question ID to user chosen Option
 }

@@ -15,6 +15,7 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
     const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
     const [currentIdx, setCurrentIdx] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [showFeedback, setShowFeedback] = useState<Record<string, boolean>>({});
     const [timeLeft, setTimeLeft] = useState(settings.durationMinutes * 60);
     const [isFinished, setIsFinished] = useState(false);
     const [startTime] = useState(new Date().toISOString());
@@ -33,22 +34,18 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
         if (isFinished) return;
         setIsFinished(true);
 
-        const quizAnswers = shuffledQuestions.map(q => ({
-            questionId: q.id,
-            selectedAnswer: answers[q.id] || '',
-            isCorrect: answers[q.id] === q.correctAnswer
-        }));
-
-        const score = quizAnswers.filter(a => a.isCorrect).length;
+        const correctCount = shuffledQuestions.reduce((acc, q) => {
+            return acc + (answers[q.id] === q.correctAnswer ? 1 : 0);
+        }, 0);
 
         const result: QuizResult = {
             userEmail: user.email,
             userName: user.name,
-            score,
+            score: correctCount,
             totalQuestions: shuffledQuestions.length,
             startTime,
             endTime: new Date().toISOString(),
-            answers: quizAnswers
+            userAnswers: answers, // Detailed answers as a dictionary
         };
 
         onComplete(result);
@@ -57,7 +54,7 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
     // Timer
     useEffect(() => {
         if (timeLeft <= 0 || isFinished) {
-            if (timeLeft <= 0) handleSubmit();
+            if (timeLeft <= 0 && !isFinished) handleSubmit();
             return;
         }
 
@@ -68,18 +65,35 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
         return () => clearInterval(timer);
     }, [timeLeft, isFinished, handleSubmit]);
 
+    const handleOptionSelect = (option: string) => {
+        if (isFinished) return;
+
+        const qId = shuffledQuestions[currentIdx].id;
+
+        // In Study mode, if already answered, don't allow change
+        if (settings.mode === 'Study' && showFeedback[qId]) return;
+
+        setAnswers({ ...answers, [qId]: option });
+
+        if (settings.mode === 'Study') {
+            setShowFeedback({ ...showFeedback, [qId]: true });
+        }
+    };
+
     if (shuffledQuestions.length === 0) return <div>Đang chuẩn bị câu hỏi...</div>;
     if (isFinished) return <div className="text-center"><h3>Đã nộp bài! Đang tính điểm...</h3></div>;
 
     const currentQuestion = shuffledQuestions[currentIdx];
-    const progress = ((currentIdx + 1) / shuffledQuestions.length) * 100;
     const timeProgress = (timeLeft / (settings.durationMinutes * 60)) * 100;
+    const isAnswered = !!answers[currentQuestion.id];
+    const isStudyMode = settings.mode === 'Study';
+    const hasFeedback = showFeedback[currentQuestion.id];
 
     return (
         <div className="container" style={{ maxWidth: '800px' }}>
             <header className="flex" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
                 <div>
-                    <h2>{settings.title}</h2>
+                    <h2>{settings.title} <span className="badge">{settings.mode === 'Study' ? 'Ôn tập' : 'Thi'}</span></h2>
                     <p className="muted-foreground">Câu hỏi {currentIdx + 1} / {shuffledQuestions.length}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -97,16 +111,35 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
             <div className="card glass" style={{ minHeight: '300px' }}>
                 <h3 className="mb-4">{currentQuestion.question}</h3>
                 <div className="grid">
-                    {currentQuestion.options.map((option, idx) => (
-                        <div
-                            key={idx}
-                            className={`option-card ${answers[currentQuestion.id] === option ? 'selected' : ''}`}
-                            onClick={() => setAnswers({ ...answers, [currentQuestion.id]: option })}
-                        >
-                            {option}
-                        </div>
-                    ))}
+                    {currentQuestion.options.map((option, idx) => {
+                        let statusClass = '';
+                        if (isStudyMode && hasFeedback) {
+                            if (option === currentQuestion.correctAnswer) statusClass = 'correct';
+                            else if (option === answers[currentQuestion.id]) statusClass = 'incorrect';
+                        } else if (answers[currentQuestion.id] === option) {
+                            statusClass = 'selected';
+                        }
+
+                        return (
+                            <div
+                                key={idx}
+                                className={`option-card ${statusClass}`}
+                                onClick={() => handleOptionSelect(option)}
+                            >
+                                {option}
+                            </div>
+                        );
+                    })}
                 </div>
+
+                {isStudyMode && hasFeedback && (
+                    <div className="explanation-box mt-4">
+                        <p><strong>Đáp án đúng:</strong> {currentQuestion.correctAnswer}</p>
+                        {currentQuestion.explanation && (
+                            <p className="mt-2"><strong>Giải thích:</strong> {currentQuestion.explanation}</p>
+                        )}
+                    </div>
+                )}
             </div>
 
             <footer className="flex" style={{ justifyContent: 'space-between', marginTop: '2rem' }}>
@@ -118,6 +151,16 @@ export default function Quiz({ questions, settings, user, onComplete }: QuizProp
                 >
                     Câu trước
                 </button>
+
+                <div className="navigation-dots flex" style={{ gap: '5px' }}>
+                    {shuffledQuestions.map((q, i) => (
+                        <div
+                            key={i}
+                            className={`dot ${i === currentIdx ? 'active' : ''} ${answers[q.id] ? 'answered' : ''}`}
+                            onClick={() => setCurrentIdx(i)}
+                        ></div>
+                    ))}
+                </div>
 
                 {currentIdx === shuffledQuestions.length - 1 ? (
                     <button className="btn-primary" style={{ backgroundColor: 'var(--secondary)' }} onClick={handleSubmit}>

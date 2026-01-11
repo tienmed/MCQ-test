@@ -93,6 +93,7 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
             durationMinutes: parseInt(settingsMap['Duration']) || 30,
             shuffleQuestions: settingsMap['ShuffleQuestions'] === 'TRUE',
             shuffleOptions: settingsMap['ShuffleOptions'] === 'TRUE',
+            mode: (settingsMap['Mode'] as 'Exam' | 'Study') || 'Exam',
         };
 
         // Fetch Questions
@@ -130,7 +131,15 @@ export async function saveQuizResult(spreadsheetId: string, result: QuizResult) 
 
     try {
         const sheets = await getSheetsClient();
-        const values = [[result.userEmail, result.userName, result.score, result.totalQuestions, result.startTime, result.endTime]];
+        const values = [[
+            result.userEmail,
+            result.userName,
+            result.score,
+            result.totalQuestions,
+            result.startTime,
+            result.endTime,
+            JSON.stringify(result.userAnswers) // Detailed answers
+        ]];
         await sheets.spreadsheets.values.append({
             spreadsheetId,
             range: 'Results!A2',
