@@ -6,11 +6,15 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 async function getSheetsClient() {
     try {
         const keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-        if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is not defined');
+        if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is missing');
 
-        const credentials = JSON.parse(keyString);
+        let credentials;
+        try {
+            credentials = JSON.parse(keyString);
+        } catch (e) {
+            throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY không đúng định dạng JSON.');
+        }
 
-        // Fix private key formatting if needed
         if (credentials.private_key) {
             credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
         }
@@ -21,15 +25,13 @@ async function getSheetsClient() {
         });
         return google.sheets({ version: 'v4', auth });
     } catch (error) {
-        console.error('Error in getSheetsClient:', error);
+        console.error('getSheetsClient Error:', error);
         throw error;
     }
 }
 
 export async function getQuizData(spreadsheetId: string): Promise<{ questions: Question[], settings: QuizSettings }> {
-    // If no credentials OR spreadsheetId is 'mock-id' or 'placeholder', return mock data
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') {
-        console.log('Using mock data because credentials/id are missing');
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !spreadsheetId || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') {
         const { mockQuestions, mockQuizSettings } = await import('./mock-data');
         return { questions: mockQuestions, settings: mockQuizSettings };
     }
@@ -37,14 +39,20 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
     try {
         const sheets = await getSheetsClient();
 
-        // Fetch Settings
-        console.log(`Fetching settings from sheet: ${spreadsheetId}`);
+        // Attempt to fetch Settings
         const settingsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: 'Settings!A1:B10',
         }).catch(err => {
-            console.error('Error fetching Settings tab:', err.message);
-            throw new Error('Không tìm thấy tab "Settings" hoặc lỗi quyền truy cập. Hãy chắc chắn bạn đã đổi tên "Sheet1" thành "Settings" và cấp quyền cho email Service Account.');
+            const status = err.response?.status;
+            const message = err.response?.data?.error?.message || err.message;
+
+            if (status === 403) {
+                throw new Error(`Google API: Lỗi 403 (Quyền truy cập). Hãy chắc chắn bạn đã bật "Google Sheets API" trong Cloud Console và cấp quyền Editor cho Service Account.`);
+            } else if (status === 404) {
+                throw new Error(`Google API: Lỗi 404 (Không tìm thấy). Hãy kiểm tra lại GOOGLE_SHEET_ID và chắc chắn Tab tên là "Settings".`);
+            }
+            throw new Error(`Google API Error (${status}): ${message}`);
         });
 
         const settingsRows = settingsResponse.data.values || [];
@@ -58,18 +66,16 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
         };
 
         // Fetch Questions
-        console.log(`Fetching questions from sheet: ${spreadsheetId}`);
         const questionsResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Questions!A2:G', // Increased to G to include explanation
+            range: 'Questions!A2:G',
         }).catch(err => {
-            console.error('Error fetching Questions tab:', err.message);
-            throw new Error('Không tìm thấy tab "Questions" hoặc lỗi quyền truy cập.');
+            throw new Error(`Lỗi khi tải tab "Questions": ${err.message}`);
         });
 
         const questionsRows = questionsResponse.data.values || [];
         const questions: Question[] = questionsRows
-            .filter(row => row[0]) // Only if question text exists
+            .filter(row => row[0])
             .map((row, index) => ({
                 id: index.toString(),
                 question: row[0],
@@ -84,40 +90,24 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
 
         return { questions, settings };
     } catch (error: any) {
-        console.error('Error in getQuizData:', error);
+        console.error('getQuizData Final Error:', error.message);
         throw error;
     }
 }
 
 export async function saveQuizResult(spreadsheetId: string, result: QuizResult) {
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') {
-        console.log('Mock: Saving result', result);
-        return;
-    }
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !spreadsheetId || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') return;
 
     try {
         const sheets = await getSheetsClient();
-        const values = [
-            [
-                result.userEmail,
-                result.userName,
-                result.score,
-                result.totalQuestions,
-                result.startTime,
-                result.endTime,
-            ],
-        ];
-
+        const values = [[result.userEmail, result.userName, result.score, result.totalQuestions, result.startTime, result.endTime]];
         await sheets.spreadsheets.values.append({
             spreadsheetId,
             range: 'Results!A2',
             valueInputOption: 'USER_ENTERED',
             requestBody: { values },
-        }).catch(err => {
-            console.error('Error appending to Results tab:', err.message);
-            // We don't throw here to not break the user experience if result logging fails
         });
     } catch (error) {
-        console.error('Error in saveQuizResult:', error);
+        console.error('saveQuizResult Error:', error);
     }
 }
