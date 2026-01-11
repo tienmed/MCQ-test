@@ -30,11 +30,14 @@ async function getSheetsClient() {
         }
 
         // Extremely robust private key formatting
-        // Convert literal \n strings to real newlines, multiple times if needed
         let key = credentials.private_key;
         if (typeof key === 'string') {
-            key = key.split('\\n').join('\n');
-            key = key.split('\\\\n').join('\n'); // Handle double escaping
+            // Handle various ways \n can be escaped or double-escaped
+            key = key.replace(/\\n/g, '\n');
+            key = key.replace(/\\\\n/g, '\n');
+
+            // Clean any starting/ending whitespace or quotes inside the JSON field
+            key = key.trim();
         }
         credentials.private_key = key;
 
