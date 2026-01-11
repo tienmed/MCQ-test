@@ -108,13 +108,24 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
         const questionsRows = questionsResponse.data.values || [];
         const questions: Question[] = questionsRows
             .filter(row => row[0])
-            .map((row, index) => ({
-                id: index.toString(),
-                question: row[0],
-                options: [row[1], row[2], row[3], row[4]].filter(Boolean),
-                correctAnswer: row[5],
-                explanation: row[6],
-            }));
+            .map((row, index) => {
+                let correctAnswer = row[5] || '';
+                const key = correctAnswer.toString().toUpperCase().trim();
+
+                // Map A, B, C, D to the actual option content
+                if (key === 'A') correctAnswer = row[1];
+                else if (key === 'B') correctAnswer = row[2];
+                else if (key === 'C') correctAnswer = row[3];
+                else if (key === 'D') correctAnswer = row[4];
+
+                return {
+                    id: index.toString(),
+                    question: row[0],
+                    options: [row[1], row[2], row[3], row[4]].filter(Boolean),
+                    correctAnswer: correctAnswer,
+                    explanation: row[6],
+                };
+            });
 
         if (questions.length === 0) {
             throw new Error('Tab "Questions" trống hoặc không đúng định dạng.');
