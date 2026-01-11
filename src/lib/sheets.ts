@@ -5,28 +5,37 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 async function getSheetsClient() {
     try {
-        const keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+        let keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
         if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is missing');
+
+        // Clean potentially extra quotes from Vercel UI
+        keyString = keyString.trim();
+        if ((keyString.startsWith('"') && keyString.endsWith('"')) || (keyString.startsWith("'") && keyString.endsWith("'"))) {
+            keyString = keyString.slice(1, -1);
+        }
 
         let credentials;
         try {
             credentials = JSON.parse(keyString);
         } catch (e) {
-            throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY không đúng định dạng JSON.');
+            throw new Error(`GOOGLE_SERVICE_ACCOUNT_KEY không đúng định dạng JSON: ${e instanceof Error ? e.message : 'Unknown'}`);
         }
 
-        if (credentials.private_key) {
-            credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+        if (!credentials.private_key) {
+            throw new Error('Service Account JSON thiếu trường "private_key".');
         }
+
+        // Fix private key formatting: handle literal \n and real newlines
+        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
 
         const auth = new google.auth.GoogleAuth({
             credentials,
             scopes: SCOPES,
         });
         return google.sheets({ version: 'v4', auth });
-    } catch (error) {
-        console.error('getSheetsClient Error:', error);
-        throw error;
+    } catch (error: any) {
+        console.error('getSheetsClient Error Detail:', error);
+        throw new Error(`Lỗi cấu hình Key: ${error.message}`);
     }
 }
 
