@@ -11,9 +11,9 @@ export async function GET(req: NextRequest) {
     try {
         const data = await getQuizData(sheetId);
         return NextResponse.json(data);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+    } catch (error: any) {
+        console.error('API GET Error:', error.message);
+        return NextResponse.json({ error: error.message || 'Lỗi không xác định khi tải dữ liệu' }, { status: 500 });
     }
 }
 
@@ -23,12 +23,12 @@ export async function POST(req: NextRequest) {
     // if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const sheetId = process.env.GOOGLE_SHEET_ID || 'mock-id';
-    const result = await req.json();
     try {
+        const result = await req.json();
         await saveQuizResult(sheetId, result);
         return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
+    } catch (error: any) {
+        console.error('API POST Error:', error.message);
+        return NextResponse.json({ error: error.message || 'Lỗi khi lưu kết quả' }, { status: 500 });
     }
 }

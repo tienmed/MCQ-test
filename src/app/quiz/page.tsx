@@ -11,6 +11,7 @@ export default function QuizPage() {
     const [data, setData] = useState<{ questions: Question[], settings: QuizSettings } | null>(null);
     const [result, setResult] = useState<QuizResult | null>(null);
     const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         // Tắt chuyển hướng để cho phép chạy thử không cần đăng nhập
@@ -23,11 +24,16 @@ export default function QuizPage() {
         async function load() {
             try {
                 const res = await fetch('/api/quiz');
-                if (!res.ok) throw new Error('Failed to fetch');
                 const quizData = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(quizData.error || 'Failed to fetch');
+                }
+
                 setData(quizData);
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to load quiz data", error);
+                setErrorMsg(error.message);
             } finally {
                 setLoading(false);
             }
@@ -50,7 +56,8 @@ export default function QuizPage() {
     };
 
     if (status === 'loading' || loading) return <div className="container text-center"><h2>Đang tải bài thi...</h2></div>;
-    if (!data) return <div className="container text-center"><h2>Lỗi khi tải dữ liệu.</h2></div>;
+    if (errorMsg) return <div className="container text-center"><h2 style={{ color: 'var(--secondary)' }}>Lỗi: {errorMsg}</h2><button className="btn-primary mt-4" onClick={() => window.location.reload()}>Thử lại</button></div>;
+    if (!data) return <div className="container text-center"><h2>Lỗi không xác định khi tải dữ liệu.</h2></div>;
 
     const displayUser = session?.user || { name: 'Thí sinh Thử nghiệm', email: 'test@example.com' };
 
