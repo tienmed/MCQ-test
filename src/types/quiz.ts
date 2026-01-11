@@ -13,6 +13,8 @@ export interface QuizSettings {
     shuffleOptions: boolean;
     mode: 'Exam' | 'Study';
     questionCount?: number;
+    availableFrom?: string; // ISO string or similar
+    availableUntil?: string; // ISO string or similar
 }
 
 export interface QuizResult {

@@ -14,16 +14,11 @@ export default function QuizPage() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
-        // Tắt chuyển hướng để cho phép chạy thử không cần đăng nhập
-        // if (status === 'unauthenticated') {
-        //   redirect('/');
-        // }
-    }, [status]);
-
-    useEffect(() => {
         async function load() {
+            setLoading(true);
             try {
-                const res = await fetch('/api/quiz');
+                const userEmail = session?.user?.email || '';
+                const res = await fetch(`/api/quiz?email=${encodeURIComponent(userEmail)}`);
                 const quizData = await res.json();
 
                 if (!res.ok) {
@@ -38,9 +33,12 @@ export default function QuizPage() {
                 setLoading(false);
             }
         }
-        // Cho phép load dữ liệu ngay cả khi chưa login (cho mục đích chạy thử)
-        load();
-    }, [status]);
+
+        // Wait for session status to be stable before loading if not in loading state
+        if (status !== 'loading') {
+            load();
+        }
+    }, [status, session]);
 
     const handleComplete = async (quizResult: QuizResult) => {
         setResult(quizResult);

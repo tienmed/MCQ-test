@@ -8,24 +8,35 @@ import { Question, QuizSettings } from '@/types/quiz';
 export default function Home() {
   const { data: session } = useSession();
   const [quizInfo, setQuizInfo] = useState<{ settings: QuizSettings, count: number } | null>(null);
+  const [restriction, setRestriction] = useState<{ error: string, alreadyCompleted?: boolean } | null>(null);
 
   useEffect(() => {
     async function fetchInfo() {
       try {
-        const res = await fetch('/api/quiz');
+        const userEmail = session?.user?.email || '';
+        const res = await fetch(`/api/quiz?email=${encodeURIComponent(userEmail)}`);
+        const data = await res.json();
+
         if (res.ok) {
-          const data = await res.json();
           setQuizInfo({
             settings: data.settings,
             count: data.questions.length
           });
+          setRestriction(null);
+        } else if (res.status === 403) {
+          setRestriction({ error: data.error, alreadyCompleted: data.alreadyCompleted });
+          if (data.settings) {
+            setQuizInfo({ settings: data.settings, count: 0 }); // Or handle appropriately
+          }
         }
       } catch (e) {
         console.error("Failed to fetch quiz info", e);
       }
     }
     fetchInfo();
-  }, []);
+  }, [session]);
+
+  const isRestricted = !!restriction;
 
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', minHeight: '90vh' }}>
@@ -47,22 +58,25 @@ export default function Home() {
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', marginTop: '3rem' }}>
           <div className="card glass">
             <h3>Sẵn sàng bắt đầu?</h3>
-            <p className="muted-foreground mb-4">Đăng nhập bằng tài khoản Google của bạn để bắt đầu làm bài trắc nghiệm và lưu kết quả.</p>
+            <p className="muted-foreground mb-4">
+              {restriction?.error || 'Đăng nhập bằng tài khoản Google của bạn để bắt đầu làm bài trắc nghiệm và lưu kết quả.'}
+            </p>
 
             {session ? (
-              <Link href="/quiz">
-                <button className="btn-primary" style={{ width: '100%' }}>Bắt đầu làm bài ngay</button>
+              <Link href={isRestricted ? "#" : "/quiz"}>
+                <button
+                  className="btn-primary"
+                  style={{ width: '100%', opacity: isRestricted ? 0.5 : 1, cursor: isRestricted ? 'not-allowed' : 'pointer' }}
+                  disabled={isRestricted}
+                >
+                  {restriction?.alreadyCompleted ? 'Bạn đã hoàn thành bài thi' : isRestricted ? 'Chưa đến giờ làm bài' : 'Bắt đầu làm bài ngay'}
+                </button>
               </Link>
             ) : (
               <div className="grid" style={{ gap: '0.5rem' }}>
                 <button className="btn-primary" style={{ width: '100%' }} onClick={() => signIn('google')}>
                   Đăng nhập với Google
                 </button>
-                <Link href="/quiz" style={{ width: '100%' }}>
-                  <button className="btn-primary" style={{ width: '100%', backgroundColor: 'var(--secondary)' }}>
-                    Chạy thử nhanh (Không cần đăng nhập)
-                  </button>
-                </Link>
               </div>
             )}
           </div>
@@ -71,17 +85,24 @@ export default function Home() {
             <h3>Tính năng MCQ</h3>
             <ul style={{ listStyleType: 'none', padding: '1rem 0' }}>
               <li style={{ marginBottom: '0.8rem' }}>
-                ✅ <strong>Câu hỏi ngẫu nhiên:</strong> {quizInfo ? `Lấy ${quizInfo.settings.questionCount || quizInfo.count} câu từ ngân hàng ${quizInfo.count} câu` : 'Đang tải...'}
+                ✅ <strong>Câu hỏi:</strong> {quizInfo ? `Lấy ${quizInfo.settings.questionCount || quizInfo.count} câu ngẫu nhiên` : 'Đang tải...'}
               </li>
               <li style={{ marginBottom: '0.8rem' }}>
                 ✅ <strong>Thời gian làm bài:</strong> {quizInfo ? `${quizInfo.settings.durationMinutes} phút` : 'Đang tải...'}
               </li>
               <li style={{ marginBottom: '0.8rem' }}>
-                ✅ <strong>Chế độ hiện tại:</strong> {quizInfo ? (quizInfo.settings.mode === 'Study' ? 'Ôn tập (Hiện giải thích)' : 'Thi cử (Bảo mật)') : 'Đang tải...'}
+                ✅ <strong>Chế độ:</strong> {quizInfo ? (quizInfo.settings.mode === 'Study' ? 'Ôn tập (Hiện giải thích)' : 'Thi cử (Bảo mật 1 lần duy nhất)') : 'Đang tải...'}
               </li>
-              <li style={{ marginBottom: '0.8rem' }}>
-                ✅ <strong>Kết quả:</strong> Tự động nộp bài khi hết giờ & Lưu vào Google Sheets
-              </li>
+              {quizInfo?.settings.availableFrom && (
+                <li style={{ marginBottom: '0.8rem' }}>
+                  📅 <strong>Bắt đầu:</strong> {quizInfo.settings.availableFrom}
+                </li>
+              )}
+              {quizInfo?.settings.availableUntil && (
+                <li style={{ marginBottom: '0.8rem' }}>
+                  ⏳ <strong>Kết thúc:</strong> {quizInfo.settings.availableUntil}
+                </li>
+              )}
             </ul>
           </div>
         </div>

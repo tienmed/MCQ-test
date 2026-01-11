@@ -95,6 +95,8 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
             shuffleOptions: settingsMap['ShuffleOptions'] === 'TRUE',
             mode: (settingsMap['Mode']?.toString().toLowerCase() === 'study') ? 'Study' : 'Exam',
             questionCount: parseInt(settingsMap['QuestionCount']) || undefined,
+            availableFrom: settingsMap['AvailableFrom'] || undefined,
+            availableUntil: settingsMap['AvailableUntil'] || undefined,
         };
 
         // Fetch Questions
@@ -135,6 +137,24 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
     } catch (error: any) {
         console.error('getQuizData Final Error:', error.message);
         throw error;
+    }
+}
+
+export async function getUserAttempts(spreadsheetId: string, email: string): Promise<number> {
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !spreadsheetId || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') return 0;
+
+    try {
+        const sheets = await getSheetsClient();
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'Results!A2:A', // Only need the email column
+        });
+
+        const rows = response.data.values || [];
+        return rows.filter(row => row[0] === email).length;
+    } catch (error) {
+        console.error('getUserAttempts Error:', error);
+        return 0;
     }
 }
 
