@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuizData, saveQuizResult, getUserAttempts } from '@/lib/sheets';
+import { getQuizData, saveQuizResult, getUserAttempts, getAllowlist } from '@/lib/sheets';
 import { auth } from '@/auth';
 
 export async function GET(req: NextRequest) {
@@ -12,7 +12,18 @@ export async function GET(req: NextRequest) {
         const { settings } = data;
         const now = new Date();
 
-        // 1. Check availability window
+        // 1. Check Allowlist (New feature)
+        if (email) {
+            const allowlist = await getAllowlist(sheetId);
+            if (allowlist.length > 0 && !allowlist.includes(email.toLowerCase())) {
+                return NextResponse.json({
+                    error: `Email (${email}) không có trong danh sách được phép tham gia. Vui lòng liên hệ BS Tiến.`,
+                    isRestricted: true
+                }, { status: 403 });
+            }
+        }
+
+        // 2. Check availability window
         if (settings.availableFrom && now < new Date(settings.availableFrom)) {
             return NextResponse.json({
                 error: `Bài thi chưa mở. Sẽ bắt đầu vào: ${settings.availableFrom}`,
@@ -26,7 +37,7 @@ export async function GET(req: NextRequest) {
             }, { status: 403 });
         }
 
-        // 2. Check attempt limit (only for Exam mode)
+        // 3. Check attempt limit (only for Exam mode)
         if (settings.mode === 'Exam' && email) {
             const attempts = await getUserAttempts(sheetId, email);
             if (attempts >= 1) {
@@ -49,6 +60,12 @@ export async function POST(req: NextRequest) {
     const sheetId = process.env.GOOGLE_SHEET_ID || 'mock-id';
     try {
         const result = await req.json();
+
+        // Safety checks
+        const allowlist = await getAllowlist(sheetId);
+        if (allowlist.length > 0 && !allowlist.includes(result.userEmail.toLowerCase())) {
+            throw new Error('Email của bạn không có quyền nộp bài.');
+        }
 
         // Re-verify attempt limit server-side for safety
         const data = await getQuizData(sheetId);

@@ -158,6 +158,24 @@ export async function getUserAttempts(spreadsheetId: string, email: string): Pro
     }
 }
 
+export async function getAllowlist(spreadsheetId: string): Promise<string[]> {
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !spreadsheetId || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') return [];
+
+    try {
+        const sheets = await getSheetsClient();
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'Danh sách!A1:A500', // Fetch up to 500 emails
+        });
+
+        const rows = response.data.values || [];
+        return rows.flat().filter(email => typeof email === 'string' && email.includes('@')).map(e => e.trim().toLowerCase());
+    } catch (error: any) {
+        console.warn('Allowlist fetch warning (likely tab missing):', error.message);
+        return []; // Return empty if tab is missing, treating it as no restriction or log error
+    }
+}
+
 export async function saveQuizResult(spreadsheetId: string, result: QuizResult) {
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !spreadsheetId || spreadsheetId === 'mock-id' || spreadsheetId === 'placeholder') return;
 
