@@ -15,6 +15,7 @@ export interface QuizSettings {
     questionCount?: number;
     availableFrom?: string; // ISO string or similar
     availableUntil?: string; // ISO string or similar
+    allowlistEnabled?: boolean;
 }
 
 export interface QuizResult {

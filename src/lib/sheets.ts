@@ -97,6 +97,7 @@ export async function getQuizData(spreadsheetId: string): Promise<{ questions: Q
             questionCount: parseInt(settingsMap['QuestionCount']) || undefined,
             availableFrom: settingsMap['AvailableFrom'] || undefined,
             availableUntil: settingsMap['AvailableUntil'] || undefined,
+            allowlistEnabled: settingsMap['List']?.toString().toUpperCase() === 'ON',
         };
 
         // Fetch Questions

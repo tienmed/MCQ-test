@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
         const { settings } = data;
         const now = new Date();
 
-        // 1. Check Allowlist (New feature)
-        if (email) {
+        // 1. Check Allowlist (Only if enabled)
+        if (settings.allowlistEnabled && email) {
             const allowlist = await getAllowlist(sheetId);
             if (allowlist.length > 0 && !allowlist.includes(email.toLowerCase())) {
                 return NextResponse.json({
@@ -23,18 +23,25 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // 2. Check availability window
-        if (settings.availableFrom && now < new Date(settings.availableFrom)) {
-            return NextResponse.json({
-                error: `Bài thi chưa mở. Sẽ bắt đầu vào: ${settings.availableFrom}`,
-                isRestricted: true
-            }, { status: 403 });
+        // 2. Check availability window (Only if values are present and not empty)
+        if (settings.availableFrom && settings.availableFrom.trim() !== '') {
+            const fromDate = new Date(settings.availableFrom);
+            if (!isNaN(fromDate.getTime()) && now < fromDate) {
+                return NextResponse.json({
+                    error: `Bài thi chưa mở. Sẽ bắt đầu vào: ${settings.availableFrom}`,
+                    isRestricted: true
+                }, { status: 403 });
+            }
         }
-        if (settings.availableUntil && now > new Date(settings.availableUntil)) {
-            return NextResponse.json({
-                error: `Bài thi đã kết thúc vào: ${settings.availableUntil}`,
-                isRestricted: true
-            }, { status: 403 });
+
+        if (settings.availableUntil && settings.availableUntil.trim() !== '') {
+            const untilDate = new Date(settings.availableUntil);
+            if (!isNaN(untilDate.getTime()) && now > untilDate) {
+                return NextResponse.json({
+                    error: `Bài thi đã kết thúc vào: ${settings.availableUntil}`,
+                    isRestricted: true
+                }, { status: 403 });
+            }
         }
 
         // 3. Check attempt limit (only for Exam mode)
@@ -62,13 +69,17 @@ export async function POST(req: NextRequest) {
         const result = await req.json();
 
         // Safety checks
-        const allowlist = await getAllowlist(sheetId);
-        if (allowlist.length > 0 && !allowlist.includes(result.userEmail.toLowerCase())) {
-            throw new Error('Email của bạn không có quyền nộp bài.');
+        const data = await getQuizData(sheetId);
+
+        // 1. Check Allowlist (Only if enabled)
+        if (data.settings.allowlistEnabled) {
+            const allowlist = await getAllowlist(sheetId);
+            if (allowlist.length > 0 && !allowlist.includes(result.userEmail.toLowerCase())) {
+                throw new Error('Email của bạn không có quyền nộp bài.');
+            }
         }
 
-        // Re-verify attempt limit server-side for safety
-        const data = await getQuizData(sheetId);
+        // 2. Re-verify attempt limit server-side for safety
         if (data.settings.mode === 'Exam') {
             const attempts = await getUserAttempts(sheetId, result.userEmail);
             if (attempts >= 1) {
